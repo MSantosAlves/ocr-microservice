@@ -1,0 +1,280 @@
+{
+  "info": {
+    "name": "OCR Microservice",
+    "_postman_id": "c7f3b4c2-1c3e-4a12-9f7a-6d22fbb6b1f5",
+    "description": "Coleção de requisições para o microserviço de OCR.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://127.0.0.1:8000"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/health",
+          "host": ["{{baseUrl}}"],
+          "path": ["health"]
+        }
+      }
+    },
+    {
+      "name": "OCR - PDF nativo",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            { "key": "file", "type": "file", "src": "samples/pdf/enem_2025.pdf" },
+            { "key": "document_type", "type": "text", "value": "pdf_native" },
+            { "key": "language", "type": "text", "value": "pt-BR" },
+            { "key": "preserve_layout", "type": "text", "value": "true" },
+            { "key": "quality_threshold", "type": "text", "value": "0.8" }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/ocr/extract",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "ocr", "extract"]
+        }
+      }
+    },
+    {
+      "name": "OCR - PDF impresso (scaneado)",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            { "key": "file", "type": "file", "src": "samples/pdf/nf_escaneada.pdf" },
+            { "key": "document_type", "type": "text", "value": "printed" },
+            { "key": "language", "type": "text", "value": "pt-BR" },
+            { "key": "preserve_layout", "type": "text", "value": "true" },
+            { "key": "quality_threshold", "type": "text", "value": "0.8" }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/ocr/extract",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "ocr", "extract"]
+        }
+      }
+    },
+    {
+      "name": "OCR - Imagem impressa",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            { "key": "file", "type": "file", "src": "samples/images/nf.jpeg" },
+            { "key": "document_type", "type": "text", "value": "printed" },
+            { "key": "language", "type": "text", "value": "pt-BR" },
+            { "key": "preserve_layout", "type": "text", "value": "true" },
+            { "key": "quality_threshold", "type": "text", "value": "0.8" }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/ocr/extract",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "ocr", "extract"]
+        }
+      }
+    },
+    {
+      "name": "OCR - Imagem manuscrita",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            { "key": "file", "type": "file", "src": "samples/images/redacao.jpg" },
+            { "key": "document_type", "type": "text", "value": "handwritten" },
+            { "key": "language", "type": "text", "value": "pt-BR" },
+            { "key": "preserve_layout", "type": "text", "value": "true" },
+            { "key": "quality_threshold", "type": "text", "value": "0.8" }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/ocr/extract",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "ocr", "extract"]
+        }
+      }
+    },
+    {
+      "name": "OCR - Documento misto",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            { "key": "file", "type": "file", "src": "samples/pdf/nf_escaneada.pdf" },
+            { "key": "document_type", "type": "text", "value": "mixed" },
+            { "key": "language", "type": "text", "value": "pt-BR" },
+            { "key": "preserve_layout", "type": "text", "value": "true" },
+            { "key": "quality_threshold", "type": "text", "value": "0.8" }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/ocr/extract",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "ocr", "extract"]
+        }
+      }
+    },
+    {
+      "name": "OCR - Listar Categorias",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/ocr/categories",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "ocr", "categories"]
+        },
+        "description": "Lista todas as categorias de documentos disponíveis para classificação automática (essay, exam, general, layout) com suas descrições e arquivos de prompt associados."
+      },
+      "response": [
+        {
+          "name": "Exemplo de resposta",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ocr/categories",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "ocr", "categories"]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"categories\": [\n    {\n      \"category\": \"essay\",\n      \"prompt_file\": \"handwritten_essay.md\",\n      \"description\": \"Redações, textos dissertativos, composições\"\n    },\n    {\n      \"category\": \"exam\",\n      \"prompt_file\": \"handwritten_exam.md\",\n      \"description\": \"Provas, testes, avaliações com questões\"\n    },\n    {\n      \"category\": \"general\",\n      \"prompt_file\": \"handwritten_general.md\",\n      \"description\": \"Documentos gerais, anotações, cartas\"\n    },\n    {\n      \"category\": \"layout\",\n      \"prompt_file\": \"handwritten_layout.md\",\n      \"description\": \"Documentos com layout complexo (tabelas, colunas)\"\n    }\n  ],\n  \"default_category\": \"general\",\n  \"classification_model\": \"claude-3-haiku-20240307\"\n}"
+        }
+      ]
+    },
+    {
+      "name": "OCR - Classificar Documento",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            { "key": "file", "type": "file", "src": "samples/images/redacao.jpg" }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/ocr/classify",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "ocr", "classify"]
+        },
+        "description": "Classifica um documento manuscrito sem realizar a extração de texto. Retorna a categoria detectada (essay, exam, general, layout), nível de confiança, raciocínio da classificação e qual prompt seria usado. Útil para testar a classificação antes de fazer OCR completo."
+      },
+      "response": [
+        {
+          "name": "Exemplo - Redação (Alta Confiança)",
+          "originalRequest": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "file", "type": "file", "src": "samples/images/redacao.jpg" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ocr/classify",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "ocr", "classify"]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"prompt_file\": \"handwritten_essay.md\",\n  \"category\": \"essay\",\n  \"confidence\": 0.95,\n  \"reasoning\": \"Documento apresenta texto contínuo com estrutura dissertativa, parágrafos bem definidos e formato típico de redação\",\n  \"model_used\": \"claude-3-haiku-20240307\",\n  \"classification_time_ms\": 850,\n  \"tokens\": {\n    \"input\": 1234,\n    \"output\": 45\n  },\n  \"is_fallback\": false,\n  \"file_info\": {\n    \"filename\": \"redacao.jpg\",\n    \"content_type\": \"image/jpeg\",\n    \"size_bytes\": 245678\n  }\n}"
+        },
+        {
+          "name": "Exemplo - Prova (Alta Confiança)",
+          "originalRequest": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "file", "type": "file", "src": "samples/images/prova.jpg" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ocr/classify",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "ocr", "classify"]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"prompt_file\": \"handwritten_exam.md\",\n  \"category\": \"exam\",\n  \"confidence\": 0.92,\n  \"reasoning\": \"Documento contém questões numeradas, formato pergunta-resposta e estrutura típica de avaliação escolar\",\n  \"model_used\": \"claude-3-haiku-20240307\",\n  \"classification_time_ms\": 780,\n  \"tokens\": {\n    \"input\": 1189,\n    \"output\": 52\n  },\n  \"is_fallback\": false,\n  \"file_info\": {\n    \"filename\": \"prova.jpg\",\n    \"content_type\": \"image/jpeg\",\n    \"size_bytes\": 312456\n  }\n}"
+        },
+        {
+          "name": "Exemplo - Baixa Confiança (Fallback)",
+          "originalRequest": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "file", "type": "file", "src": "samples/images/anotacao.jpg" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ocr/classify",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "ocr", "classify"]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"prompt_file\": \"handwritten_general.md\",\n  \"category\": \"general\",\n  \"confidence\": 0.65,\n  \"reasoning\": \"Documento com anotações informais sem estrutura específica clara\",\n  \"model_used\": \"claude-3-haiku-20240307\",\n  \"classification_time_ms\": 920,\n  \"tokens\": {\n    \"input\": 1056,\n    \"output\": 38\n  },\n  \"is_fallback\": false,\n  \"file_info\": {\n    \"filename\": \"anotacao.jpg\",\n    \"content_type\": \"image/jpeg\",\n    \"size_bytes\": 198234\n  }\n}"
+        }
+      ]
+    }
+  ]
+}
