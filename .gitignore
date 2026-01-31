@@ -25,3 +25,4 @@ venv.bak/
 .env
 .env.*
 .DS_Store
+samples/

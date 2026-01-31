@@ -12,7 +12,15 @@ class Settings(BaseSettings):
     allowed_origins: str = "*"
     max_upload_size_mb: int = 20
     temp_dir: str = "/tmp/ocr-service"
-    api_key: Optional[str] = None
+    openai_api_key: Optional[str] = None
+    openai_model: Optional[str] = None
+    openai_timeout_seconds: int = 60
+    openai_max_retries: int = 3
+    anthropic_api_key: Optional[str] = None
+    anthropic_model: Optional[str] = None
+    anthropic_classifier_model: Optional[str] = None
+    anthropic_timeout_seconds: int = 60
+    anthropic_max_retries: int = 3
 
     class Config:
         env_file = ".env"

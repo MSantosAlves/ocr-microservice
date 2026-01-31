@@ -4,3 +4,11 @@ pydantic
 pydantic-settings
 python-multipart
 python-dotenv
+pymupdf
+pillow
+opencv-python-headless
+scikit-image
+paddleocr
+paddlepaddle
+openai
+anthropic
