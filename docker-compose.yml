@@ -5,3 +5,32 @@ services:
     build: .
     ports:
       - "8000:8000"
+    environment:
+      MONGODB_URI: "mongodb://mongodb:27017"
+      MONGODB_DB: "ocr_service"
+      MONGODB_COLLECTION: "ocr_jobs"
+      REDIS_BROKER_URL: "redis://redis:6379/0"
+      REDIS_BACKEND_URL: "redis://redis:6379/1"
+    depends_on:
+      - mongodb
+      - redis
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  mongodb:
+    image: mongo:7
+    ports:
+      - "27017:27017"
+
+  flower:
+    image: mher/flower
+    ports:
+      - "5555:5555"
+    environment:
+      CELERY_BROKER_URL: "redis://redis:6379/0"
+      CELERY_RESULT_BACKEND: "redis://redis:6379/1"
+    depends_on:
+      - redis

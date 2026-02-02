@@ -8,9 +8,12 @@ from fastapi.responses import JSONResponse
 from PIL import Image
 
 from app.core.config import get_settings
+from app.core.db import create_job, get_job, update_job
 from app.core.orchestrator import OCRCoreOrchestrator, OCRProcessingError
 from app.core.prompt_router import DocumentPromptRouter
+from app.models.job import JobCreateResponse, JobStatus, OCRJob
 from app.models.schemas import DocumentType, ErrorResponse, OCRRequest, OCRResponse
+from app.tasks.ocr_tasks import process_ocr_job
 
 
 router = APIRouter(prefix="/ocr", tags=["ocr"])
@@ -110,6 +113,93 @@ def extract_text(
     finally:
         if temp_path and temp_path.exists():
             temp_path.unlink()
+
+
+@router.post("/extract-async", response_model=JobCreateResponse)
+def extract_text_async(
+    file: UploadFile = File(...),
+    document_type: DocumentType = Form(DocumentType.AUTO),
+    language: str = Form("pt-BR"),
+    preserve_layout: bool = Form(True),
+    quality_threshold: float = Form(0.8),
+) -> Union[JobCreateResponse, JSONResponse]:
+    if file.content_type not in ALLOWED_MIME_TYPES:
+        return _error_response(
+            status_code=415,
+            code="UNSUPPORTED_DOCUMENT_TYPE",
+            message="Unsupported file type",
+            details={"content_type": file.content_type},
+            suggestion="Upload a PDF, JPG, or PNG file",
+        )
+
+    request = OCRRequest(
+        document_type=document_type,
+        language=language,
+        preserve_layout=preserve_layout,
+        quality_threshold=quality_threshold,
+    )
+
+    max_bytes = settings.max_upload_size_mb * 1024 * 1024
+    temp_path = None
+    job_id = uuid.uuid4().hex
+    job_created = False
+
+    try:
+        temp_path, size_bytes = _save_upload_to_temp(file, max_bytes)
+        create_job(
+            {
+                "job_id": job_id,
+                "status": JobStatus.PENDING.value,
+                "input_meta": {
+                    "original_filename": file.filename or "",
+                    "content_type": file.content_type or "",
+                    "size_bytes": size_bytes,
+                    "document_type": document_type.value,
+                    "language": language,
+                    "preserve_layout": preserve_layout,
+                    "quality_threshold": quality_threshold,
+                },
+            }
+        )
+        job_created = True
+        process_ocr_job.delay(
+            job_id,
+            str(temp_path),
+            file.content_type or "",
+            request.model_dump(),
+        )
+        return JobCreateResponse(job_id=job_id, status=JobStatus.PENDING)
+    except Exception as error:
+        if job_created:
+            update_job(
+                job_id,
+                {
+                    "status": JobStatus.FAILED.value,
+                    "error": {
+                        "code": "JOB_ENQUEUE_FAILED",
+                        "message": "Failed to enqueue job",
+                        "details": {"reason": str(error)},
+                        "suggestion": "Try again later",
+                    },
+                },
+            )
+        if temp_path and temp_path.exists():
+            temp_path.unlink()
+        return _error_response(
+            status_code=500,
+            code="JOB_ENQUEUE_FAILED",
+            message="Failed to enqueue job",
+            details={"reason": str(error)},
+            suggestion="Try again later",
+        )
+
+
+@router.get("/jobs/{job_id}", response_model=OCRJob)
+def get_job_status(job_id: str) -> OCRJob:
+    job_data = get_job(job_id)
+    if not job_data:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return OCRJob(**job_data)
 
 
 @router.get("/categories")

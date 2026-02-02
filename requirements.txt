@@ -12,3 +12,8 @@ paddleocr
 paddlepaddle
 openai
 anthropic
+celery
+redis
+pymongo
+requests
+flower

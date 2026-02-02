@@ -9,6 +9,10 @@
     {
       "key": "baseUrl",
       "value": "http://127.0.0.1:8000"
+    },
+    {
+      "key": "jobId",
+      "value": ""
     }
   ],
   "item": [
@@ -45,6 +49,62 @@
           "path": ["api", "v1", "ocr", "extract"]
         }
       }
+    },
+    {
+      "name": "OCR - PDF nativo (async)",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            { "key": "file", "type": "file", "src": "samples/pdf/enem_2025.pdf" },
+            { "key": "document_type", "type": "text", "value": "pdf_native" },
+            { "key": "language", "type": "text", "value": "pt-BR" },
+            { "key": "preserve_layout", "type": "text", "value": "true" },
+            { "key": "quality_threshold", "type": "text", "value": "0.8" }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/ocr/extract-async",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "ocr", "extract-async"]
+        }
+      },
+      "response": [
+        {
+          "name": "Exemplo de resposta",
+          "originalRequest": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "file", "type": "file", "src": "samples/pdf/enem_2025.pdf" },
+                { "key": "document_type", "type": "text", "value": "pdf_native" },
+                { "key": "language", "type": "text", "value": "pt-BR" },
+                { "key": "preserve_layout", "type": "text", "value": "true" },
+                { "key": "quality_threshold", "type": "text", "value": "0.8" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ocr/extract-async",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "ocr", "extract-async"]
+            }
+          },
+          "status": "Accepted",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"job_id\": \"d3f4c44c0d9b4aa28d3f7a81e4d3ef91\",\n  \"status\": \"PENDING\"\n}"
+        }
+      ]
     },
     {
       "name": "OCR - PDF impresso (scaneado)",
@@ -133,6 +193,87 @@
           "path": ["api", "v1", "ocr", "extract"]
         }
       }
+    },
+    {
+      "name": "OCR - Status do Job",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/ocr/jobs/{{jobId}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "ocr", "jobs", "{{jobId}}"]
+        },
+        "description": "Consulta o status e resultado de um job assíncrono."
+      },
+      "response": [
+        {
+          "name": "Exemplo - Em processamento",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ocr/jobs/{{jobId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "ocr", "jobs", "{{jobId}}"]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"job_id\": \"d3f4c44c0d9b4aa28d3f7a81e4d3ef91\",\n  \"status\": \"STARTED\",\n  \"created_at\": \"2026-02-02T12:00:00Z\",\n  \"updated_at\": \"2026-02-02T12:00:05Z\",\n  \"input_meta\": {\n    \"original_filename\": \"enem_2025.pdf\",\n    \"content_type\": \"application/pdf\",\n    \"size_bytes\": 123456,\n    \"document_type\": \"pdf_native\",\n    \"language\": \"pt-BR\",\n    \"preserve_layout\": true,\n    \"quality_threshold\": 0.8\n  }\n}"
+        },
+        {
+          "name": "Exemplo - Sucesso",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ocr/jobs/{{jobId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "ocr", "jobs", "{{jobId}}"]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"job_id\": \"d3f4c44c0d9b4aa28d3f7a81e4d3ef91\",\n  \"status\": \"SUCCESS\",\n  \"created_at\": \"2026-02-02T12:00:00Z\",\n  \"updated_at\": \"2026-02-02T12:00:10Z\",\n  \"duration_ms\": 9820,\n  \"input_meta\": {\n    \"original_filename\": \"enem_2025.pdf\",\n    \"content_type\": \"application/pdf\",\n    \"size_bytes\": 123456,\n    \"document_type\": \"pdf_native\",\n    \"language\": \"pt-BR\",\n    \"preserve_layout\": true,\n    \"quality_threshold\": 0.8\n  },\n  \"result\": {\n    \"text\": \"Texto extraído...\",\n    \"confidence\": 0.97,\n    \"document_type\": \"pdf_native\",\n    \"processor_used\": \"pdf_native\",\n    \"processing_time_ms\": 9800,\n    \"warnings\": [],\n    \"metadata\": {\n      \"original_filename\": \"enem_2025.pdf\",\n      \"content_type\": \"application/pdf\",\n      \"size_bytes\": 123456\n    }\n  }\n}"
+        },
+        {
+          "name": "Exemplo - Falha",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ocr/jobs/{{jobId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "ocr", "jobs", "{{jobId}}"]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"job_id\": \"d3f4c44c0d9b4aa28d3f7a81e4d3ef91\",\n  \"status\": \"FAILED\",\n  \"created_at\": \"2026-02-02T12:00:00Z\",\n  \"updated_at\": \"2026-02-02T12:00:08Z\",\n  \"duration_ms\": 3200,\n  \"input_meta\": {\n    \"original_filename\": \"enem_2025.pdf\",\n    \"content_type\": \"application/pdf\",\n    \"size_bytes\": 123456,\n    \"document_type\": \"pdf_native\",\n    \"language\": \"pt-BR\",\n    \"preserve_layout\": true,\n    \"quality_threshold\": 0.8\n  },\n  \"error\": {\n    \"code\": \"OCR_FAILED\",\n    \"message\": \"Failed to extract text\",\n    \"details\": {\n      \"reason\": \"Timeout\"\n    },\n    \"suggestion\": \"Try again later\"\n  }\n}"
+        }
+      ]
     },
     {
       "name": "OCR - Listar Categorias",
