@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     allowed_origins: str = "*"
     max_upload_size_mb: int = 20
+    zip_max_upload_size_mb: int = 50
     temp_dir: str = "/tmp/ocr-service"
     openai_api_key: Optional[str] = None
     openai_model: Optional[str] = None

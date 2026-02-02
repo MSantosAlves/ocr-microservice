@@ -209,6 +209,54 @@
       }
     },
     {
+      "name": "OCR - Bulk async (ZIP)",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            { "key": "file", "type": "file", "src": "samples/zip/bulk.zip" }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/ocr/extract-async-bulk-zip",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "ocr", "extract-async-bulk-zip"]
+        }
+      },
+      "response": [
+        {
+          "name": "Exemplo de resposta",
+          "originalRequest": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "file", "type": "file", "src": "samples/zip/bulk.zip" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ocr/extract-async-bulk-zip",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "ocr", "extract-async-bulk-zip"]
+            }
+          },
+          "status": "Accepted",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"parent_job_id\": \"b7e0b8cf3c4f4a5b9d4c2a0c1b2a3d4e\",\n  \"status\": \"PENDING\",\n  \"children\": [\n    {\n      \"job_id\": \"a1c2d3e4f5g6h7i8j9k0\",\n      \"filename\": \"doc1.pdf\",\n      \"status\": \"PENDING\"\n    },\n    {\n      \"job_id\": \"z9y8x7w6v5u4t3s2r1q0\",\n      \"filename\": \"doc2.jpg\",\n      \"status\": \"PENDING\"\n    }\n  ]\n}"
+        }
+      ]
+    },
+    {
       "name": "OCR - Imagem manuscrita",
       "request": {
         "method": "POST",

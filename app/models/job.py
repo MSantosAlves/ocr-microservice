@@ -54,3 +54,4 @@ class BulkJobCreateResponse(BaseModel):
     parent_job_id: str
     status: JobStatus
     children: List[ChildJobStatus]
+    ignored_files: Optional[List[str]] = None

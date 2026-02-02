@@ -30,6 +30,13 @@ curl -X POST "http://127.0.0.1:8000/api/v1/ocr/extract-async-bulk" \
   -F "quality_threshold=0.8"
 ```
 
+### Bulk async (ZIP)
+
+```bash
+curl -X POST "http://127.0.0.1:8000/api/v1/ocr/extract-async-bulk-zip" \
+  -F "file=@/path/to/bulk.zip"
+```
+
 Consulta do status:
 
 ```bash

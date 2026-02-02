@@ -32,7 +32,7 @@ class OCRResponse(BaseModel):
 class ErrorDetail(BaseModel):
     code: str
     message: str
-    details: Optional[Dict[str, Union[str, int, float, bool]]] = None
+    details: Optional[Dict[str, Union[str, int, float, bool, List[str]]]] = None
     suggestion: Optional[str] = None
 
 

@@ -1,5 +1,7 @@
 import os
 import uuid
+import zipfile
+from io import BytesIO
 from pathlib import Path
 from typing import Dict, List, Tuple, Union
 
@@ -36,6 +38,7 @@ orchestrator = OCRCoreOrchestrator()
 prompt_router = DocumentPromptRouter()
 
 ALLOWED_MIME_TYPES = {"application/pdf", "image/jpeg", "image/png"}
+ALLOWED_ZIP_EXTENSIONS = {".pdf", ".jpg", ".jpeg", ".png"}
 
 
 def _save_upload_to_temp(upload_file: UploadFile, max_bytes: int) -> Tuple[Path, int]:
@@ -55,6 +58,62 @@ def _save_upload_to_temp(upload_file: UploadFile, max_bytes: int) -> Tuple[Path,
             temp_file.write(chunk)
 
     return temp_path, size_bytes
+
+
+def _safe_zip_name(member_name: str) -> str | None:
+    cleaned = member_name.replace("\\", "/")
+    if cleaned.startswith("/") or cleaned.startswith("../") or "/../" in cleaned:
+        return None
+    if cleaned.endswith("/"):
+        return None
+    return cleaned
+
+
+def _extract_zip_files(
+    zip_upload: UploadFile, zip_max_bytes: int, file_max_bytes: int
+) -> Tuple[List[Tuple[str, Path, int, str]], List[str]]:
+    os.makedirs(settings.temp_dir, exist_ok=True)
+    zip_bytes = zip_upload.file.read(zip_max_bytes + 1)
+    if len(zip_bytes) > zip_max_bytes:
+        raise HTTPException(status_code=413, detail="ZIP exceeds max size limit")
+
+    try:
+        zip_file = zipfile.ZipFile(BytesIO(zip_bytes))
+    except zipfile.BadZipFile as exc:
+        raise HTTPException(status_code=400, detail="Invalid ZIP file") from exc
+
+    extracted: List[Tuple[str, Path, int, str]] = []
+    ignored: List[str] = []
+    for info in zip_file.infolist():
+        safe_name = _safe_zip_name(info.filename)
+        if not safe_name:
+            continue
+        base_name = Path(safe_name).name
+        if base_name.startswith("._") or base_name.startswith("."):
+            ignored.append(base_name)
+            continue
+        suffix = Path(safe_name).suffix.lower()
+        if suffix not in ALLOWED_ZIP_EXTENSIONS:
+            ignored.append(base_name)
+            continue
+
+        temp_path = Path(settings.temp_dir) / f"{uuid.uuid4().hex}{suffix}"
+        with zip_file.open(info) as zipped_file, temp_path.open("wb") as temp_file:
+            size_bytes = 0
+            while True:
+                chunk = zipped_file.read(1024 * 1024)
+                if not chunk:
+                    break
+                size_bytes += len(chunk)
+                if size_bytes > file_max_bytes:
+                    temp_path.unlink(missing_ok=True)
+                    raise HTTPException(
+                        status_code=413, detail="Extracted file exceeds max size limit"
+                    )
+                temp_file.write(chunk)
+        extracted.append((base_name, temp_path, size_bytes, suffix))
+
+    return extracted, ignored
 
 
 @router.post("/extract", response_model=OCRResponse)
@@ -226,6 +285,20 @@ def extract_text_async_bulk(
             suggestion="Upload at least one file",
         )
 
+    zip_files = [
+        upload.filename
+        for upload in files
+        if (upload.filename or "").lower().endswith(".zip")
+    ]
+    if zip_files:
+        return _error_response(
+            status_code=415,
+            code="UNSUPPORTED_ZIP_BULK",
+            message="ZIP files are not supported in this endpoint",
+            details={"files": zip_files},
+            suggestion="Use /api/v1/ocr/extract-async-bulk-zip",
+        )
+
     invalid_files = [
         upload.filename
         for upload in files
@@ -339,6 +412,9 @@ def extract_text_async_bulk(
             children=child_statuses,
         )
     except HTTPException:
+        for _, temp_path, _ in temp_files:
+            if temp_path.exists():
+                temp_path.unlink()
         raise
     except Exception as error:
         for _, temp_path, _ in temp_files:
@@ -357,13 +433,146 @@ def extract_text_async_bulk(
 def extract_text_async_bulk_zip(
     file: UploadFile = File(...),
 ) -> JSONResponse:
-    return _error_response(
-        status_code=501,
-        code="BULK_ZIP_NOT_IMPLEMENTED",
-        message="ZIP bulk upload not implemented",
-        details={"filename": file.filename, "content_type": file.content_type},
-        suggestion="Use multipart files with /api/v1/ocr/extract-async-bulk",
-    )
+    if not (file.filename or "").lower().endswith(".zip"):
+        return _error_response(
+            status_code=415,
+            code="UNSUPPORTED_ZIP_TYPE",
+            message="Only ZIP files are supported",
+            details={"filename": file.filename, "content_type": file.content_type},
+            suggestion="Upload a .zip file",
+        )
+
+    request = OCRRequest(document_type=DocumentType.AUTO)
+    zip_max_bytes = settings.zip_max_upload_size_mb * 1024 * 1024
+    file_max_bytes = settings.max_upload_size_mb * 1024 * 1024
+    parent_job_id = uuid.uuid4().hex
+
+    extracted_files: List[Tuple[str, Path, int, str]] = []
+    ignored_files: List[str] = []
+    try:
+        extracted_files, ignored_files = _extract_zip_files(
+            file, zip_max_bytes, file_max_bytes
+        )
+        if not extracted_files:
+            return _error_response(
+                status_code=400,
+                code="EMPTY_ZIP",
+                message="No supported files found in ZIP",
+                details={"filename": file.filename, "ignored_files": ignored_files},
+                suggestion="Include PDF/JPG/PNG files in the ZIP",
+            )
+
+        child_jobs: List[Dict[str, Union[str, int, float, bool]]] = []
+        child_statuses: List[ChildJobStatus] = []
+        for filename, _, size_bytes, suffix in extracted_files:
+            child_job_id = uuid.uuid4().hex
+            if suffix == ".pdf":
+                content_type = "application/pdf"
+            elif suffix in {".jpg", ".jpeg"}:
+                content_type = "image/jpeg"
+            else:
+                content_type = f"image/{suffix.lstrip('.')}"
+            child_jobs.append(
+                {
+                    "job_id": child_job_id,
+                    "status": JobStatus.PENDING.value,
+                    "job_type": JobType.BULK_CHILD.value,
+                    "parent_job_id": parent_job_id,
+                    "input_meta": {
+                        "original_filename": filename,
+                        "content_type": content_type,
+                        "size_bytes": size_bytes,
+                        "document_type": DocumentType.AUTO.value,
+                        "language": request.language,
+                        "preserve_layout": request.preserve_layout,
+                        "quality_threshold": request.quality_threshold,
+                    },
+                }
+            )
+            child_statuses.append(
+                ChildJobStatus(
+                    job_id=child_job_id,
+                    filename=filename,
+                    status=JobStatus.PENDING,
+                )
+            )
+
+        create_bulk_jobs(
+            {
+                "job_id": parent_job_id,
+                "status": JobStatus.PENDING.value,
+                "job_type": JobType.BULK_PARENT.value,
+                "input_meta": {
+                    "total_files": len(extracted_files),
+                    "document_type": DocumentType.AUTO.value,
+                    "language": request.language,
+                    "preserve_layout": request.preserve_layout,
+                    "quality_threshold": request.quality_threshold,
+                },
+                "children_summary": {
+                    "total": len(extracted_files),
+                    "pending": len(extracted_files),
+                    "started": 0,
+                    "success": 0,
+                    "failed": 0,
+                },
+            },
+            child_jobs,
+        )
+
+        for (filename, temp_path, _, suffix), child_job in zip(extracted_files, child_jobs):
+            try:
+                if suffix == ".pdf":
+                    content_type = "application/pdf"
+                elif suffix in {".jpg", ".jpeg"}:
+                    content_type = "image/jpeg"
+                else:
+                    content_type = f"image/{suffix.lstrip('.')}"
+                process_ocr_job.delay(
+                    child_job["job_id"],
+                    str(temp_path),
+                    content_type,
+                    request.model_dump(),
+                    parent_job_id,
+                )
+            except Exception as error:
+                update_job(
+                    child_job["job_id"],
+                    {
+                        "status": JobStatus.FAILED.value,
+                        "error": {
+                            "code": "JOB_ENQUEUE_FAILED",
+                            "message": "Failed to enqueue job",
+                            "details": {"reason": str(error)},
+                            "suggestion": "Try again later",
+                        },
+                    },
+                )
+                if temp_path.exists():
+                    temp_path.unlink()
+        update_parent_aggregate(parent_job_id)
+        return BulkJobCreateResponse(
+            parent_job_id=parent_job_id,
+            status=JobStatus.PENDING,
+            children=child_statuses,
+            ignored_files=ignored_files or None,
+        )
+    except HTTPException:
+        for _, temp_path, _, _ in extracted_files:
+            if temp_path.exists():
+                temp_path.unlink()
+        raise
+    except Exception as error:
+        for _, temp_path, _, _ in extracted_files:
+            if temp_path.exists():
+                temp_path.unlink()
+        return _error_response(
+            status_code=500,
+            code="JOB_ENQUEUE_FAILED",
+            message="Failed to enqueue job",
+            details={"reason": str(error)},
+            suggestion="Try again later",
+        )
 
 
 @router.get("/jobs/{job_id}", response_model=OCRJob)
