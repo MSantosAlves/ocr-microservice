@@ -22,6 +22,7 @@ class JobType(str, Enum):
 
 
 class ChildJobStatus(BaseModel):
+    id: Optional[str] = None
     job_id: str
     filename: str
     status: JobStatus
@@ -31,6 +32,7 @@ class ChildJobStatus(BaseModel):
 
 
 class OCRJob(BaseModel):
+    id: Optional[str] = None
     job_id: str
     status: JobStatus
     job_type: JobType = JobType.SINGLE

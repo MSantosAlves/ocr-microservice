@@ -2,6 +2,7 @@ from datetime import datetime, timezone
 from functools import lru_cache
 from typing import Any, Dict, Iterable, List, Optional
 
+from bson import ObjectId
 from pymongo import MongoClient, ReturnDocument
 
 from app.core.config import get_settings
@@ -24,9 +25,18 @@ def get_collection():
     return client[settings.mongodb_db][settings.mongodb_collection]
 
 
+def _stringify_mongo_id(value: Any) -> Optional[str]:
+    if isinstance(value, ObjectId):
+        return str(value)
+    if value is None:
+        return None
+    return str(value)
+
+
 def _strip_mongo_id(document: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
     if not document:
         return None
+    document["id"] = _stringify_mongo_id(document.get("_id"))
     document.pop("_id", None)
     return document
 

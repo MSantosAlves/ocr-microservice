@@ -77,41 +77,41 @@ def _extract_zip_files(
     if len(zip_bytes) > zip_max_bytes:
         raise HTTPException(status_code=413, detail="ZIP exceeds max size limit")
 
-    try:
-        zip_file = zipfile.ZipFile(BytesIO(zip_bytes))
-    except zipfile.BadZipFile as exc:
-        raise HTTPException(status_code=400, detail="Invalid ZIP file") from exc
-
     extracted: List[Tuple[str, Path, int, str]] = []
     ignored: List[str] = []
-    for info in zip_file.infolist():
-        safe_name = _safe_zip_name(info.filename)
-        if not safe_name:
-            continue
-        base_name = Path(safe_name).name
-        if base_name.startswith("._") or base_name.startswith("."):
-            ignored.append(base_name)
-            continue
-        suffix = Path(safe_name).suffix.lower()
-        if suffix not in ALLOWED_ZIP_EXTENSIONS:
-            ignored.append(base_name)
-            continue
+    try:
+        with zipfile.ZipFile(BytesIO(zip_bytes)) as zip_file:
+            for info in zip_file.infolist():
+                safe_name = _safe_zip_name(info.filename)
+                if not safe_name:
+                    continue
+                base_name = Path(safe_name).name
+                if base_name.startswith("._") or base_name.startswith("."):
+                    ignored.append(base_name)
+                    continue
+                suffix = Path(safe_name).suffix.lower()
+                if suffix not in ALLOWED_ZIP_EXTENSIONS:
+                    ignored.append(base_name)
+                    continue
 
-        temp_path = Path(settings.temp_dir) / f"{uuid.uuid4().hex}{suffix}"
-        with zip_file.open(info) as zipped_file, temp_path.open("wb") as temp_file:
-            size_bytes = 0
-            while True:
-                chunk = zipped_file.read(1024 * 1024)
-                if not chunk:
-                    break
-                size_bytes += len(chunk)
-                if size_bytes > file_max_bytes:
-                    temp_path.unlink(missing_ok=True)
-                    raise HTTPException(
-                        status_code=413, detail="Extracted file exceeds max size limit"
-                    )
-                temp_file.write(chunk)
-        extracted.append((base_name, temp_path, size_bytes, suffix))
+                temp_path = Path(settings.temp_dir) / f"{uuid.uuid4().hex}{suffix}"
+                with zip_file.open(info) as zipped_file, temp_path.open("wb") as temp_file:
+                    size_bytes = 0
+                    while True:
+                        chunk = zipped_file.read(1024 * 1024)
+                        if not chunk:
+                            break
+                        size_bytes += len(chunk)
+                        if size_bytes > file_max_bytes:
+                            temp_path.unlink(missing_ok=True)
+                            raise HTTPException(
+                                status_code=413,
+                                detail="Extracted file exceeds max size limit",
+                            )
+                        temp_file.write(chunk)
+                extracted.append((base_name, temp_path, size_bytes, suffix))
+    except zipfile.BadZipFile as exc:
+        raise HTTPException(status_code=400, detail="Invalid ZIP file") from exc
 
     return extracted, ignored
 
@@ -586,6 +586,7 @@ def get_job_status(job_id: str) -> OCRJob:
         children_docs = get_children_jobs(job_id)
         children_status = [
             ChildJobStatus(
+                id=child.get("id"),
                 job_id=child["job_id"],
                 filename=child.get("input_meta", {}).get("original_filename", ""),
                 status=JobStatus(child["status"]),
