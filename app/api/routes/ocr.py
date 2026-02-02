@@ -8,10 +8,24 @@ from fastapi.responses import JSONResponse
 from PIL import Image
 
 from app.core.config import get_settings
-from app.core.db import create_job, get_job, update_job
+from app.core.db import (
+    create_bulk_jobs,
+    create_job,
+    get_children_jobs,
+    get_job,
+    update_job,
+    update_parent_aggregate,
+)
 from app.core.orchestrator import OCRCoreOrchestrator, OCRProcessingError
 from app.core.prompt_router import DocumentPromptRouter
-from app.models.job import JobCreateResponse, JobStatus, OCRJob
+from app.models.job import (
+    BulkJobCreateResponse,
+    ChildJobStatus,
+    JobCreateResponse,
+    JobStatus,
+    JobType,
+    OCRJob,
+)
 from app.models.schemas import DocumentType, ErrorResponse, OCRRequest, OCRResponse
 from app.tasks.ocr_tasks import process_ocr_job
 
@@ -150,6 +164,7 @@ def extract_text_async(
             {
                 "job_id": job_id,
                 "status": JobStatus.PENDING.value,
+                "job_type": JobType.SINGLE.value,
                 "input_meta": {
                     "original_filename": file.filename or "",
                     "content_type": file.content_type or "",
@@ -194,11 +209,184 @@ def extract_text_async(
         )
 
 
+@router.post("/extract-async-bulk", response_model=BulkJobCreateResponse)
+def extract_text_async_bulk(
+    files: List[UploadFile] = File(...),
+    document_type: DocumentType = Form(DocumentType.AUTO),
+    language: str = Form("pt-BR"),
+    preserve_layout: bool = Form(True),
+    quality_threshold: float = Form(0.8),
+) -> Union[BulkJobCreateResponse, JSONResponse]:
+    if not files:
+        return _error_response(
+            status_code=400,
+            code="EMPTY_BULK_REQUEST",
+            message="No files uploaded",
+            details=None,
+            suggestion="Upload at least one file",
+        )
+
+    invalid_files = [
+        upload.filename
+        for upload in files
+        if upload.content_type not in ALLOWED_MIME_TYPES
+    ]
+    if invalid_files:
+        return _error_response(
+            status_code=415,
+            code="UNSUPPORTED_DOCUMENT_TYPE",
+            message="Unsupported file type",
+            details={"files": invalid_files},
+            suggestion="Upload PDF, JPG, or PNG files",
+        )
+
+    request = OCRRequest(
+        document_type=document_type,
+        language=language,
+        preserve_layout=preserve_layout,
+        quality_threshold=quality_threshold,
+    )
+
+    max_bytes = settings.max_upload_size_mb * 1024 * 1024
+    parent_job_id = uuid.uuid4().hex
+    temp_files: List[Tuple[UploadFile, Path, int]] = []
+
+    try:
+        for upload in files:
+            temp_path, size_bytes = _save_upload_to_temp(upload, max_bytes)
+            temp_files.append((upload, temp_path, size_bytes))
+
+        child_jobs: List[Dict[str, Union[str, int, float, bool]]] = []
+        child_statuses: List[ChildJobStatus] = []
+        for upload, _, size_bytes in temp_files:
+            child_job_id = uuid.uuid4().hex
+            child_jobs.append(
+                {
+                    "job_id": child_job_id,
+                    "status": JobStatus.PENDING.value,
+                    "job_type": JobType.BULK_CHILD.value,
+                    "parent_job_id": parent_job_id,
+                    "input_meta": {
+                        "original_filename": upload.filename or "",
+                        "content_type": upload.content_type or "",
+                        "size_bytes": size_bytes,
+                        "document_type": document_type.value,
+                        "language": language,
+                        "preserve_layout": preserve_layout,
+                        "quality_threshold": quality_threshold,
+                    },
+                }
+            )
+            child_statuses.append(
+                ChildJobStatus(
+                    job_id=child_job_id,
+                    filename=upload.filename or "",
+                    status=JobStatus.PENDING,
+                )
+            )
+
+        create_bulk_jobs(
+            {
+                "job_id": parent_job_id,
+                "status": JobStatus.PENDING.value,
+                "job_type": JobType.BULK_PARENT.value,
+                "input_meta": {
+                    "total_files": len(temp_files),
+                    "document_type": document_type.value,
+                    "language": language,
+                    "preserve_layout": preserve_layout,
+                    "quality_threshold": quality_threshold,
+                },
+                "children_summary": {
+                    "total": len(temp_files),
+                    "pending": len(temp_files),
+                    "started": 0,
+                    "success": 0,
+                    "failed": 0,
+                },
+            },
+            child_jobs,
+        )
+
+        for (upload, temp_path, _), child_job in zip(temp_files, child_jobs):
+            try:
+                process_ocr_job.delay(
+                    child_job["job_id"],
+                    str(temp_path),
+                    upload.content_type or "",
+                    request.model_dump(),
+                    parent_job_id,
+                )
+            except Exception as error:
+                update_job(
+                    child_job["job_id"],
+                    {
+                        "status": JobStatus.FAILED.value,
+                        "error": {
+                            "code": "JOB_ENQUEUE_FAILED",
+                            "message": "Failed to enqueue job",
+                            "details": {"reason": str(error)},
+                            "suggestion": "Try again later",
+                        },
+                    },
+                )
+                if temp_path.exists():
+                    temp_path.unlink()
+        update_parent_aggregate(parent_job_id)
+        return BulkJobCreateResponse(
+            parent_job_id=parent_job_id,
+            status=JobStatus.PENDING,
+            children=child_statuses,
+        )
+    except HTTPException:
+        raise
+    except Exception as error:
+        for _, temp_path, _ in temp_files:
+            if temp_path.exists():
+                temp_path.unlink()
+        return _error_response(
+            status_code=500,
+            code="JOB_ENQUEUE_FAILED",
+            message="Failed to enqueue job",
+            details={"reason": str(error)},
+            suggestion="Try again later",
+        )
+
+
+@router.post("/extract-async-bulk-zip")
+def extract_text_async_bulk_zip(
+    file: UploadFile = File(...),
+) -> JSONResponse:
+    return _error_response(
+        status_code=501,
+        code="BULK_ZIP_NOT_IMPLEMENTED",
+        message="ZIP bulk upload not implemented",
+        details={"filename": file.filename, "content_type": file.content_type},
+        suggestion="Use multipart files with /api/v1/ocr/extract-async-bulk",
+    )
+
+
 @router.get("/jobs/{job_id}", response_model=OCRJob)
 def get_job_status(job_id: str) -> OCRJob:
     job_data = get_job(job_id)
     if not job_data:
         raise HTTPException(status_code=404, detail="Job not found")
+    if job_data.get("job_type") == JobType.BULK_PARENT.value:
+        update_parent_aggregate(job_id)
+        job_data = get_job(job_id) or job_data
+        children_docs = get_children_jobs(job_id)
+        children_status = [
+            ChildJobStatus(
+                job_id=child["job_id"],
+                filename=child.get("input_meta", {}).get("original_filename", ""),
+                status=JobStatus(child["status"]),
+                result=child.get("result"),
+                error=child.get("error"),
+                duration_ms=child.get("duration_ms"),
+            )
+            for child in children_docs
+        ]
+        job_data = {**job_data, "children": children_status}
     return OCRJob(**job_data)
 
 

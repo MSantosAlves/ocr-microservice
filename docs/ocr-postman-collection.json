@@ -129,6 +129,64 @@
       }
     },
     {
+      "name": "OCR - Bulk async",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            { "key": "files", "type": "file", "src": "samples/pdf/enem_2025.pdf" },
+            { "key": "files", "type": "file", "src": "samples/images/nf.jpeg" },
+            { "key": "document_type", "type": "text", "value": "auto" },
+            { "key": "language", "type": "text", "value": "pt-BR" },
+            { "key": "preserve_layout", "type": "text", "value": "true" },
+            { "key": "quality_threshold", "type": "text", "value": "0.8" }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/ocr/extract-async-bulk",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "ocr", "extract-async-bulk"]
+        }
+      },
+      "response": [
+        {
+          "name": "Exemplo de resposta",
+          "originalRequest": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "files", "type": "file", "src": "samples/pdf/enem_2025.pdf" },
+                { "key": "files", "type": "file", "src": "samples/images/nf.jpeg" },
+                { "key": "document_type", "type": "text", "value": "auto" },
+                { "key": "language", "type": "text", "value": "pt-BR" },
+                { "key": "preserve_layout", "type": "text", "value": "true" },
+                { "key": "quality_threshold", "type": "text", "value": "0.8" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ocr/extract-async-bulk",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "ocr", "extract-async-bulk"]
+            }
+          },
+          "status": "Accepted",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"parent_job_id\": \"b7e0b8cf3c4f4a5b9d4c2a0c1b2a3d4e\",\n  \"status\": \"PENDING\",\n  \"children\": [\n    {\n      \"job_id\": \"a1c2d3e4f5g6h7i8j9k0\",\n      \"filename\": \"enem_2025.pdf\",\n      \"status\": \"PENDING\"\n    },\n    {\n      \"job_id\": \"z9y8x7w6v5u4t3s2r1q0\",\n      \"filename\": \"nf.jpeg\",\n      \"status\": \"PENDING\"\n    }\n  ]\n}"
+        }
+      ]
+    },
+    {
       "name": "OCR - Imagem impressa",
       "request": {
         "method": "POST",
@@ -272,6 +330,29 @@
             }
           ],
           "body": "{\n  \"job_id\": \"d3f4c44c0d9b4aa28d3f7a81e4d3ef91\",\n  \"status\": \"FAILED\",\n  \"created_at\": \"2026-02-02T12:00:00Z\",\n  \"updated_at\": \"2026-02-02T12:00:08Z\",\n  \"duration_ms\": 3200,\n  \"input_meta\": {\n    \"original_filename\": \"enem_2025.pdf\",\n    \"content_type\": \"application/pdf\",\n    \"size_bytes\": 123456,\n    \"document_type\": \"pdf_native\",\n    \"language\": \"pt-BR\",\n    \"preserve_layout\": true,\n    \"quality_threshold\": 0.8\n  },\n  \"error\": {\n    \"code\": \"OCR_FAILED\",\n    \"message\": \"Failed to extract text\",\n    \"details\": {\n      \"reason\": \"Timeout\"\n    },\n    \"suggestion\": \"Try again later\"\n  }\n}"
+        }
+        ,
+        {
+          "name": "Exemplo - Bulk parcial",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/ocr/jobs/{{jobId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "ocr", "jobs", "{{jobId}}"]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": "json",
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json"
+            }
+          ],
+          "body": "{\n  \"job_id\": \"b7e0b8cf3c4f4a5b9d4c2a0c1b2a3d4e\",\n  \"status\": \"PARTIAL_SUCCESS\",\n  \"job_type\": \"bulk_parent\",\n  \"created_at\": \"2026-02-02T12:00:00Z\",\n  \"updated_at\": \"2026-02-02T12:00:12Z\",\n  \"input_meta\": {\n    \"total_files\": 2,\n    \"document_type\": \"auto\",\n    \"language\": \"pt-BR\",\n    \"preserve_layout\": true,\n    \"quality_threshold\": 0.8\n  },\n  \"children_summary\": {\n    \"total\": 2,\n    \"pending\": 0,\n    \"started\": 0,\n    \"success\": 1,\n    \"failed\": 1\n  },\n  \"children\": [\n    {\n      \"job_id\": \"a1c2d3e4f5g6h7i8j9k0\",\n      \"filename\": \"enem_2025.pdf\",\n      \"status\": \"SUCCESS\",\n      \"result\": {\n        \"text\": \"Texto extraído...\",\n        \"confidence\": 0.97,\n        \"document_type\": \"pdf_native\",\n        \"processor_used\": \"pdf_native\",\n        \"processing_time_ms\": 9800,\n        \"warnings\": [],\n        \"metadata\": {\n          \"original_filename\": \"enem_2025.pdf\",\n          \"content_type\": \"application/pdf\",\n          \"size_bytes\": 123456\n        }\n      }\n    },\n    {\n      \"job_id\": \"z9y8x7w6v5u4t3s2r1q0\",\n      \"filename\": \"nf.jpeg\",\n      \"status\": \"FAILED\",\n      \"error\": {\n        \"code\": \"OCR_FAILED\",\n        \"message\": \"Failed to extract text\",\n        \"details\": {\n          \"reason\": \"Timeout\"\n        },\n        \"suggestion\": \"Try again later\"\n      }\n    }\n  ]\n}"
         }
       ]
     },

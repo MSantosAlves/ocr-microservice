@@ -4,7 +4,7 @@ from time import perf_counter
 from typing import Any, Dict
 
 from app.core.celery_app import celery_app
-from app.core.db import update_job
+from app.core.db import update_job, update_parent_aggregate
 from app.core.orchestrator import OCRCoreOrchestrator, OCRProcessingError
 from app.models.job import JobStatus
 from app.models.schemas import ErrorDetail, OCRRequest
@@ -19,9 +19,12 @@ def process_ocr_job(
     file_path: str,
     content_type: str,
     request_data: Dict[str, Any],
+    parent_job_id: str | None = None,
 ) -> None:
     start_time = perf_counter()
     update_job(job_id, {"status": JobStatus.STARTED.value})
+    if parent_job_id:
+        update_parent_aggregate(parent_job_id)
 
     temp_path = Path(file_path)
     try:
@@ -36,6 +39,8 @@ def process_ocr_job(
                 "duration_ms": duration_ms,
             },
         )
+        if parent_job_id:
+            update_parent_aggregate(parent_job_id)
         logger.info("job %s completed in %sms", job_id, duration_ms)
     except OCRProcessingError as error:
         duration_ms = int((perf_counter() - start_time) * 1000)
@@ -53,6 +58,8 @@ def process_ocr_job(
                 "duration_ms": duration_ms,
             },
         )
+        if parent_job_id:
+            update_parent_aggregate(parent_job_id)
         logger.warning("job %s failed: %s", job_id, error.message)
     except Exception as error:
         duration_ms = int((perf_counter() - start_time) * 1000)
@@ -70,6 +77,8 @@ def process_ocr_job(
                 "duration_ms": duration_ms,
             },
         )
+        if parent_job_id:
+            update_parent_aggregate(parent_job_id)
         logger.exception("job %s crashed", job_id)
     finally:
         if temp_path.exists():
