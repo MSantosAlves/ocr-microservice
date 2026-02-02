@@ -121,7 +121,7 @@
           "mode": "formdata",
           "formdata": [
             { "key": "file", "type": "file", "src": "samples/pdf/nf_escaneada.pdf" },
-            { "key": "document_type", "type": "text", "value": "mixed" },
+            { "key": "document_type", "type": "text", "value": "printed" },
             { "key": "language", "type": "text", "value": "pt-BR" },
             { "key": "preserve_layout", "type": "text", "value": "true" },
             { "key": "quality_threshold", "type": "text", "value": "0.8" }
