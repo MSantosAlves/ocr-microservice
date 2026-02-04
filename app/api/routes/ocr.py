@@ -5,11 +5,12 @@ from io import BytesIO
 from pathlib import Path
 from typing import Dict, List, Tuple, Union
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
 from PIL import Image
 
 from app.core.config import get_settings
+from app.core.security import verify_ocr_api_key
 from app.core.db import (
     create_bulk_jobs,
     create_job,
@@ -32,7 +33,11 @@ from app.models.schemas import DocumentType, ErrorResponse, OCRRequest, OCRRespo
 from app.tasks.ocr_tasks import process_ocr_job
 
 
-router = APIRouter(prefix="/ocr", tags=["ocr"])
+router = APIRouter(
+    prefix="/ocr",
+    tags=["ocr"],
+    dependencies=[Depends(verify_ocr_api_key)],
+)
 settings = get_settings()
 orchestrator = OCRCoreOrchestrator()
 prompt_router = DocumentPromptRouter()

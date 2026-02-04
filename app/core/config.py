@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     max_upload_size_mb: int = 20
     zip_max_upload_size_mb: int = 50
     temp_dir: str = "/tmp/ocr-service"
+    ocr_api_key: Optional[str] = None
     openai_api_key: Optional[str] = None
     openai_model: Optional[str] = None
     openai_timeout_seconds: int = 60
