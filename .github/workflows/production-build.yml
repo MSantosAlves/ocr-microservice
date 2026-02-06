@@ -28,8 +28,8 @@ jobs:
       - name: Build and push OCR image
         uses: docker/build-push-action@v6
         with:
-          context: ./ocr-service
-          file: ./ocr-service/Dockerfile
+          context: .
+          file: ./Dockerfile
           push: true
           tags: |
             msantosalves404/revisa-facil:ocr-latest
