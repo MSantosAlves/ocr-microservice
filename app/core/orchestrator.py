@@ -1,5 +1,6 @@
 import time
 from typing import Optional
+from pathlib import Path
 
 from PIL import Image
 
@@ -33,6 +34,8 @@ class OCRProcessingError(Exception):
 
 
 class OCRCoreOrchestrator:
+    BLOCKED_PROMPT_CATEGORIES = {"malicious_content", "non_related_content"}
+
     def __init__(self) -> None:
         self.classifier = DocumentClassifier()
         self.settings = get_settings()
@@ -206,6 +209,8 @@ class OCRCoreOrchestrator:
             prompt_name, routing_metadata = self.prompt_router.classify_multipage(images)
         else:
             prompt_name, routing_metadata = self.prompt_router.classify(images[0])
+
+        self._raise_if_blocked_category(file_path, routing_metadata)
         
         text, processor_used, warnings, usage = self._run_ai_pages(images, prompt_name)
         processing_time_ms = int((time.monotonic() - start_time) * 1000)
@@ -241,6 +246,7 @@ class OCRCoreOrchestrator:
     ) -> OCRResponse:
         with Image.open(file_path) as image:
             prompt_name, routing_metadata = self.prompt_router.classify(image)
+            self._raise_if_blocked_category(file_path, routing_metadata)
             text, processor_used, warnings, usage = self._run_ai_pages([image], prompt_name)
 
         processing_time_ms = int((time.monotonic() - start_time) * 1000)
@@ -268,6 +274,38 @@ class OCRCoreOrchestrator:
                 "layout_preserved": request.preserve_layout,
             },
         )
+
+    def _raise_if_blocked_category(self, file_path: str, routing_metadata: dict) -> None:
+        category = str(routing_metadata.get("category") or "").strip().lower()
+        if category not in self.BLOCKED_PROMPT_CATEGORIES:
+            return
+
+        deleted = self._delete_document_file(file_path)
+        status_code = 403 if category == "malicious_content" else 422
+
+        raise OCRProcessingError(
+            code="DOCUMENT_REJECTED_BY_CLASSIFIER",
+            message="Document rejected by content classifier",
+            details={
+                "blocked_category": category,
+                "classifier_confidence": routing_metadata.get("confidence"),
+                "classifier_reasoning": routing_metadata.get("reasoning"),
+                "document_deleted": deleted,
+            },
+            suggestion="Upload a valid educational document.",
+            status_code=status_code,
+        )
+
+    def _delete_document_file(self, file_path: str) -> bool:
+        path = Path(file_path)
+        if not path.exists():
+            return False
+        try:
+            path.unlink()
+            return True
+        except Exception as error:
+            self.logger.warning("Failed to delete blocked document: %s", error)
+            return False
 
     def _run_ai_pages(
         self, images: list[Image.Image], prompt_name: str

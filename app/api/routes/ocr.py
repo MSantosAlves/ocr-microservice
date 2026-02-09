@@ -640,6 +640,7 @@ def classify_document(
         )
     
     max_bytes = settings.max_upload_size_mb * 1024 * 1024
+    blocked_categories = {"malicious_content", "non_related_content"}
     temp_path = None
     
     try:
@@ -647,12 +648,21 @@ def classify_document(
         
         with Image.open(temp_path) as image:
             prompt_name, metadata = prompt_router.classify(image)
+
+        category = metadata.get("category")
+        is_blocked = category in blocked_categories
+        deleted_immediately = False
+        if is_blocked and temp_path.exists():
+            temp_path.unlink()
+            deleted_immediately = True
         
         return {
             "prompt_file": prompt_name,
-            "category": metadata.get("category"),
+            "category": category,
             "confidence": metadata.get("confidence"),
             "reasoning": metadata.get("reasoning"),
+            "is_blocked": is_blocked,
+            "document_deleted": deleted_immediately,
             "model_used": metadata.get("model"),
             "classification_time_ms": metadata.get("classification_time_ms"),
             "tokens": {

@@ -26,7 +26,7 @@ class DocumentPromptRouter:
     - general: Documentos gerais, anotações, cartas
     """
     
-    CATEGORIES = ("essay", "exam", "general")
+    CATEGORIES = ("essay", "exam", "general", "malicious_content", "non_related_content")
     PROMPT_MAP = {
         "essay": "handwritten_essay.md",
         "exam": "exam.md",
@@ -130,16 +130,42 @@ class DocumentPromptRouter:
                 
                 # Parse da resposta com validação de confiança
                 category, confidence, reasoning = self._parse_classification_response(content)
+                category = self._force_malicious_when_prompt_injection(
+                    category=category,
+                    raw_response=content,
+                    reasoning=reasoning,
+                )
                 
-                # Verificar se a confiança está acima do limiar
+                # Para categorias bloqueadas, retornar imediatamente sem selecionar prompt.
+                if category in {"malicious_content", "non_related_content"}:
+                    classification_time_ms = int((time.monotonic() - start_time) * 1000)
+                    self.logger.warning(
+                        "Documento bloqueado pelo classificador: category=%s, confidence=%.2f",
+                        category,
+                        confidence,
+                    )
+                    return "", {
+                        "category": category,
+                        "confidence": confidence,
+                        "reasoning": reasoning,
+                        "model": self.model,
+                        "input_tokens": input_tokens,
+                        "output_tokens": output_tokens,
+                        "classification_time_ms": classification_time_ms,
+                        "attempts": attempt,
+                        "is_blocked_category": True,
+                    }
+
+                # Para categorias válidas, aplicar threshold e fallback para "general".
                 if confidence < confidence_threshold:
                     self.logger.warning(
                         f"Baixa confiança na classificação: {confidence:.2f} < {confidence_threshold}. "
                         f"Usando categoria padrão 'general'."
                     )
                     category = "general"
-                
-                prompt_name = self.PROMPT_MAP.get(category, "handwritten_general.md")
+                    prompt_name = "handwritten_general.md"
+                else:
+                    prompt_name = self.PROMPT_MAP.get(category, "handwritten_general.md")
                 classification_time_ms = int((time.monotonic() - start_time) * 1000)
                 
                 self.logger.info(
@@ -171,6 +197,42 @@ class DocumentPromptRouter:
         # Se todas as tentativas falharem, usar fallback
         self.logger.error(f"Todas as tentativas de classificação falharam: {last_error}")
         return self._get_fallback_prompt(last_error)
+
+    def _force_malicious_when_prompt_injection(
+        self,
+        category: str,
+        raw_response: str,
+        reasoning: str,
+    ) -> str:
+        """
+        Override defensivo para reduzir falso-negativo de conteúdo malicioso.
+        Se houver sinais claros de prompt injection/manipulação, forçar malicious_content.
+        """
+        if category == "malicious_content":
+            return category
+
+        combined = f"{raw_response} {reasoning}".lower()
+        suspicious_patterns = (
+            "chave de api",
+            "api key",
+            "token de api",
+            "prompt injection",
+            "engenharia de prompt",
+            "ignore as instruções",
+            "ignore previous instructions",
+            "burlar regras",
+            "bypass",
+            "jailbreak",
+            "system prompt",
+        )
+
+        if any(pattern in combined for pattern in suspicious_patterns):
+            self.logger.warning(
+                "Reclassificando para malicious_content por sinal de prompt injection."
+            )
+            return "malicious_content"
+
+        return category
 
     def _build_classification_prompt(self) -> str:
         """Carrega o prompt de classificação do cache ou arquivo .md."""
@@ -226,7 +288,10 @@ class DocumentPromptRouter:
     
     def _extract_category_from_text(self, content: str) -> str:
         """Extrai categoria do texto usando regex como fallback."""
-        match = re.search(r'\b(essay|exam|general)\b', content.lower())
+        match = re.search(
+            r"\b(essay|exam|general|malicious_content|non_related_content)\b",
+            content.lower(),
+        )
         if match:
             return match.group(1)
         return "general"
@@ -328,6 +393,16 @@ class DocumentPromptRouter:
             Lista de dicionários com informações das categorias
         """
         return [
+            {
+                "category": "malicious_content",
+                "prompt_file": "none",
+                "description": "Conteúdo malicioso/proibido; documento deve ser bloqueado",
+            },
+            {
+                "category": "non_related_content",
+                "prompt_file": "none",
+                "description": "Conteúdo fora do contexto educacional",
+            },
             {
                 "category": "essay",
                 "prompt_file": "handwritten_essay.md",
